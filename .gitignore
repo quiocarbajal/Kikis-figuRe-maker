@@ -1,0 +1,16 @@
+# Local trials on real (unpublished) projects: never publish
+trials/
+
+# Personal Claude Code setup (rules and permissions for this machine)
+CLAUDE.md
+.claude/settings.local.json
+
+# R and Quarto byproducts
+.Rhistory
+.RData
+.Rproj.user/
+.quarto/
+*_files/
+
+# macOS
+.DS_Store

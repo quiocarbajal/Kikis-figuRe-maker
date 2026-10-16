@@ -1,0 +1,11 @@
+setting	value	description
+journal	nature_communications	journal_id from settings/journal_presets.tsv
+final_output_folder	Figures	where journal figures (SVG and PDF) are written, relative to the project folder
+font_family		leave empty to keep each plot's font; set (e.g. Arial) to apply one font to every ggplot2 plot
+line_width_pt		one line width (pt) for axis lines and plot lines in every figure; leave empty to use the journal's default_line_pt
+figure_label_pattern	^fig-(s?[0-9]+)	regular expression: chunk labels matching it belong to a figure; the first group is the figure number (fig-3a -> Figure3, fig-s2b -> FigureS2)
+draft_plot_width_mm	58	starting width for plots without a size yet (round 0)
+draft_plot_height_mm	45	starting height for plots without a size yet (round 0)
+panel_gap_mm	4	space between panels in the round-0 layout
+inkscape_path		leave empty to find Inkscape automatically
+toolkit_version		filled in by install_figure_assembly()

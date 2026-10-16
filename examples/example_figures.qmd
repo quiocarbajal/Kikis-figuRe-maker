@@ -1,0 +1,63 @@
+---
+title: "Example figures document for the figure-assembly toolkit"
+format:
+  html:
+    embed-resources: true
+execute-dir: project
+---
+
+<!--
+Made-up example. To try it:
+1. Copy this file into an empty project folder.
+2. In R, from the toolkit folder:
+     for (toolkit_file in list.files("R", pattern = "\\.R$", full.names = TRUE)) source(toolkit_file)
+     install_figure_assembly("<empty project folder>", ".", journal_id = "nature")
+3. Ask Claude for a round-0 layout of Figure1 (or fill panel_specs.tsv yourself),
+   render this document, and build the canvas: build_figure_canvas("Figure1").
+-->
+
+```{r}
+#| label: setup-figure-assembly
+#| include: false
+draft_mode <- TRUE # FALSE for the final render
+for (toolkit_file in list.files(file.path("figure_assembly", "R"), pattern = "\\.R$", full.names = TRUE)) source(toolkit_file)
+figure_assembly <- start_figure_assembly(draft_mode = draft_mode)
+figure_style <- figure_assembly$figure_style
+figure_pheatmap <- figure_assembly$figure_pheatmap
+figure_euler_plot <- figure_assembly$figure_euler_plot
+```
+
+```{r}
+#| label: fig-1a-scatter-weight-vs-mpg
+ggplot(mtcars, aes(x = wt, y = mpg, colour = factor(cyl))) +
+  geom_point(size = 2) +
+  theme_classic() +
+  labs(title = "Weight vs mpg", colour = "Cylinders") +
+  figure_style()
+```
+
+```{r}
+#| label: fig-1b-bar-counts-by-cylinders
+ggplot(mtcars, aes(x = factor(cyl))) +
+  geom_bar() +
+  theme_classic() +
+  labs(title = "Cars per cylinder count", x = "Cylinders") +
+  figure_style()
+```
+
+```{r}
+#| label: fig-1c-heatmap-correlations
+figure_pheatmap(cor(mtcars[, 1:6]), fontsize = 10)
+```
+
+```{r}
+#| label: fig-1d-euler-overlap
+euler_fit <- eulerr::euler(c(A = 10, B = 8, "A&B" = 4))
+figure_euler_plot(euler_fit, quantities = TRUE)
+```
+
+```{r}
+#| label: exploratory-plot-not-in-any-figure
+# Does not match the figure label pattern: left exactly as written.
+plot(mtcars$hp, mtcars$qsec)
+```
