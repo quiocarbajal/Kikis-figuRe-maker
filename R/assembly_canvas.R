@@ -43,6 +43,7 @@ box_note_settings <- tribble(
   "move to annotations", "move_to_annotations", "moved",    "ggplot",
   "transparency",       "alpha",               "number",    "ggplot",
   "legend",             "legend_position",     "legend",    "ggplot",
+  "legend layout",      "legend_box_layout",   "legend layout", "ggplot",
   "title text",         "title_text",          "text",      "ggplot",
   "subtitle text",      "subtitle_text",       "text",      "ggplot",
   "caption text",       "caption_text",        "text",      "ggplot",
@@ -111,6 +112,14 @@ parse_setting_value <- function(written_value, value_type) {
   }
   if (value_type == "colour" && tolower(cleaned_value) == "none") {
     return(list(value = "NA", problem = NA_character_))
+  }
+  if (value_type == "legend layout") {
+    layout_value <- tolower(cleaned_value)
+    if (!layout_value %in% c("vertical", "horizontal")) {
+      return(list(value = NA_character_, problem = paste0("legend layout must be vertical or horizontal: '",
+                                                          cleaned_value, "'")))
+    }
+    return(list(value = layout_value, problem = NA_character_))
   }
   if (value_type == "face") {
     face_value <- str_replace_all(tolower(cleaned_value), "[ -]", ".")
@@ -569,8 +578,6 @@ prefix_svg_ids <- function(svg_node, id_prefix) {
   invisible(svg_node)
 }
 
-# Places one svglite plot file on the plots layer, at native size: the only
-# scaling is the unit conversion from the plot's points to page millimetres.
 # Inserts the content of an svglite file as one group at (x_mm, y_mm), at its
 # native size (unit conversion only). Returns the group and the file's size.
 insert_svglite_content <- function(parent_node, svg_path, group_id, group_label, x_mm, y_mm) {
@@ -592,15 +599,19 @@ insert_svglite_content <- function(parent_node, svg_path, group_id, group_label,
   list(group = new_group, width_mm = svg_geometry$page_width_mm, height_mm = svg_geometry$page_height_mm)
 }
 
-# Elements of a plot moved to annotations (legend, facet labels, Euler set
-# names) are added to the annotations layer once, inside the plot's box: the
-# legend at the top right, words stacked at the top left. They are never added
-# again while an element with the same id exists, so they become yours to move
-# and edit.
+# Elements of a plot moved to annotations (legend, facet labels, point labels,
+# Euler set names) are added to the annotations layer once, inside the plot's
+# box: the legend at the top right, words below the note card. Each element is
+# placed only once: panel_specs.tsv records it in moved_placed, and from then
+# on it is yours (moved, ungrouped, edited or deleted, it is never re-added).
+# Returns the elements placed by this call.
 add_moved_elements <- function(annotations_layer, panel_row, plot_folder_path) {
   moved_elements <- parse_moved_elements(panel_row$move_to_annotations)
+  already_placed <- parse_moved_elements(panel_row$moved_placed)
+  moved_elements <- setdiff(moved_elements, already_placed)
+  newly_placed <- character()
   if (length(moved_elements) == 0) {
-    return(invisible(annotations_layer))
+    return(newly_placed)
   }
   existing_ids <- xml_attr(xml_find_all(annotations_layer, ".//*[@id]"), "id")
   box_x <- as.numeric(panel_row$x_mm)
@@ -613,30 +624,50 @@ add_moved_elements <- function(annotations_layer, panel_row, plot_folder_path) {
     legend_size <- read_svg_page_geometry(read_xml(legend_path))
     insert_svglite_content(annotations_layer, legend_path, legend_id, paste("legend:", panel_row$plot_id),
                            box_x + box_width - legend_size$page_width_mm - 1, box_y + 1)
+    newly_placed <- c(newly_placed, "legend")
   }
 
   labels_path <- file.path(plot_folder_path, paste0(panel_row$plot_id, "-moved-labels.tsv"))
-  label_id_prefix <- paste0("moved__", panel_row$plot_id, "__label__")
-  if (file.exists(labels_path) && !any(str_starts(existing_ids, label_id_prefix))) {
+  if (file.exists(labels_path)) {
     # Facet labels can be recorded twice (once per patchwork sub-plot), so repeats
-    # are dropped; repeated Euler set names (e.g. "Genes" in three diagrams) are kept.
+    # are dropped; repeated Euler set names (e.g. "Genes" in three diagrams) and
+    # cluster names (one set per facet) are kept.
     moved_labels <- read_tsv(labels_path, col_types = cols(.default = col_character()))
     moved_labels <- moved_labels[!(moved_labels$label_kind == "strip label" & duplicated(moved_labels)), ]
-    # Start below the box's note card, so the words are visible on the working canvas.
+    # Each kind (strip label, point label, set name) has its own ids, so a newly
+    # moved kind is added even when another kind from the same plot already exists.
+    moved_labels$id_prefix <- paste0("moved__", panel_row$plot_id, "__", str_replace_all(moved_labels$label_kind, " ", "-"), "__")
+    # Label kinds and the moved element each belongs to (only elements not yet placed are kept).
+    moved_labels$element <- c("strip label" = "strip labels", "point label" = "point labels",
+                              "set name" = "set names")[moved_labels$label_kind]
+    labels_to_place <- dplyr::filter(moved_labels, element %in% moved_elements)
+    newly_placed <- c(newly_placed, unique(labels_to_place$element))
+    # Start below the box's note card, so the words are visible on the working
+    # canvas, and wrap into further columns instead of running out of the box.
     note_card_height_mm <- length(format_box_note_lines(panel_row)) * point_to_millimetre(6) * 1.25 + 1.5
-    box_y <- box_y + note_card_height_mm
-    for (label_index in seq_len(nrow(moved_labels))) {
-      label_row <- moved_labels[label_index, ]
-      size_column <- if (label_row$label_kind == "set name") "euler_label_pt" else "strip_text_pt"
+    box_bottom <- box_y + as.numeric(panel_row$height_mm)
+    first_row_y <- box_y + note_card_height_mm + 3
+    column_x <- box_x + 2
+    row_y <- first_row_y
+    for (label_index in seq_len(nrow(labels_to_place))) {
+      label_row <- labels_to_place[label_index, ]
+      size_column <- switch(label_row$label_kind, "set name" = "euler_label_pt", "point label" = "label_text_pt",
+                            "strip_text_pt")
       label_pt <- coalesce(as.numeric(panel_row[[size_column]]), 6)
       label_size_mm <- point_to_millimetre(label_pt)
-      add_text_lines(annotations_layer, label_row$label, box_x + 2,
-                     box_y + 3 + label_size_mm + (label_index - 1) * label_size_mm * 1.6,
+      row_step_mm <- label_size_mm * 1.6
+      if (row_y + label_size_mm > box_bottom - 1 && row_y > first_row_y) {
+        column_width_mm <- max(nchar(labels_to_place$label)) * 0.6 * label_size_mm + 3
+        column_x <- column_x + column_width_mm
+        row_y <- first_row_y
+      }
+      add_text_lines(annotations_layer, label_row$label, column_x, row_y + label_size_mm,
                      label_size_mm, label_size_mm * 1.25, "font-family:Arial;fill:#000000",
-                     element_id = paste0(label_id_prefix, label_index))
+                     element_id = paste0(label_row$id_prefix, label_index))
+      row_y <- row_y + row_step_mm
     }
   }
-  invisible(annotations_layer)
+  newly_placed
 }
 
 add_plot_to_canvas <- function(plots_layer, plot_svg_path, plot_id, x_mm, y_mm, expected_width_mm,
@@ -797,8 +828,10 @@ build_figure_canvas <- function(figure_name, canvas_purpose = c("working", "jour
   }
   plot_folder_path <- file.path(figure_drafting_directory(assembly_directory, figure_name),
                                 if (canvas_purpose == "working") "plots" else "final_plots")
+  newly_placed_elements <- list()
   for (panel_index in seq_len(nrow(figure_panels))) {
-    add_moved_elements(annotations_layer, figure_panels[panel_index, ], plot_folder_path)
+    newly_placed <- add_moved_elements(annotations_layer, figure_panels[panel_index, ], plot_folder_path)
+    if (length(newly_placed) > 0) newly_placed_elements[[figure_panels$plot_id[panel_index]]] <- newly_placed
   }
 
   if (canvas_purpose == "working") {
@@ -850,6 +883,20 @@ build_figure_canvas <- function(figure_name, canvas_purpose = c("working", "jour
   # No indentation: whitespace between text lines would be read as text.
   write_xml(canvas_document, output_path, options = "as_xml")
   message("Written: ", output_path)
+
+  # Moved elements placed by this build are recorded, so later builds never add them again.
+  if (length(newly_placed_elements) > 0) {
+    panel_specs_path <- file.path(assembly_directory, "specs", "panel_specs.tsv")
+    all_panel_specs <- read_panel_specs(panel_specs_path)
+    for (plot_id in names(newly_placed_elements)) {
+      row_position <- which(all_panel_specs$plot_id == plot_id)
+      placed_now <- union(parse_moved_elements(all_panel_specs$moved_placed[row_position]), newly_placed_elements[[plot_id]])
+      all_panel_specs$moved_placed[row_position] <- paste(placed_now, collapse = ", ")
+      message("Placed on the annotations layer and recorded in panel_specs.tsv (moved_placed): ", plot_id, ": ",
+              paste(newly_placed_elements[[plot_id]], collapse = ", "))
+    }
+    write_panel_specs(all_panel_specs, panel_specs_path)
+  }
   invisible(output_path)
 }
 

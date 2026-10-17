@@ -31,7 +31,8 @@ Use the toolkit (`read_canvas_boxes()`, `read_canvas_plot_positions()`, `compare
    - heatmap text → `heatmap_font_pt` (row and column variants exist)
    - Euler labels or numbers → `euler_label_pt` / `euler_quantity_pt`
 
-   - "legend as annotation", "I'll place the labels myself" → `move_to_annotations` (`legend`, `strip labels`; `set names` for Euler). Never move values computed from data (counts, statistics): they would stop updating.
+   - "legend as annotation", "I'll place the labels myself" → `move_to_annotations` (`legend`, `strip labels`, `point labels`; `set names` for Euler). Never move values computed from data (counts, statistics, e.g. a forest plot's odds-ratio labels): they would stop updating. `moved_placed` is written by the build; clear an entry only when the user asks for a fresh copy.
+   - several legends too wide → `legend_box_layout = vertical`.
    - renaming or formatting facet labels or set names (italics, superscripts) → move them to annotations; the user retypes them in Inkscape. Do not rename data values.
    - bold/plain axis text → `axis_text_face`; dots mapped to data too big → `mapped_size_factor`.
 

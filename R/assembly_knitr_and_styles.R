@@ -96,6 +96,11 @@ build_appearance_theme <- function(panel_specs, plot_id, font_family, plot) {
   if (!is.na(legend_position)) {
     theme_settings$legend.position <- legend_position
   }
+  # Several legends (e.g. dot size and colour) stacked or side by side.
+  legend_box_layout <- lookup_panel_spec(panel_specs, plot_id, "legend_box_layout", default = NA_character_)
+  if (!is.na(legend_box_layout)) {
+    theme_settings$legend.box <- legend_box_layout
+  }
   if (!is.null(font_family) && !is.na(font_family) && font_family != "") {
     theme_settings$text <- element_text(family = font_family)
   }
@@ -295,7 +300,7 @@ start_figure_assembly <- function(draft_mode = TRUE,
 
 # ---- Moving elements to annotations --------------------------------------------
 
-moved_element_names <- list(ggplot = c("legend", "strip labels"), euler = c("set names"))
+moved_element_names <- list(ggplot = c("legend", "strip labels", "point labels"), euler = c("set names"))
 
 parse_moved_elements <- function(stored_value) {
   if (is.null(stored_value) || is.na(stored_value) || stored_value == "") {
@@ -387,6 +392,18 @@ add_figure_style_to_plot <- function(object, plot, ...) {
     hidden_strip_text <- set_names(rep(list(element_blank()), length(theme_text_elements$strip_text_pt)),
                                    theme_text_elements$strip_text_pt)
     restyled_plot <- restyled_plot + do.call(theme, hidden_strip_text)
+  }
+  if ("point labels" %in% moved_elements) {
+    # Text-label layers (geom_text, geom_label, ggrepel; e.g. Seurat's cluster
+    # names from label = TRUE) are dropped; their words are recorded. Points,
+    # colours and every other layer stay as they are.
+    is_text_layer <- vapply(restyled_plot$layers, \(plot_layer) inherits(plot_layer$geom, text_geom_classes), TRUE)
+    if (any(is_text_layer)) {
+      built_layers <- ggplot_build(restyled_plot)$data
+      point_labels <- unlist(map(built_layers[is_text_layer], \(layer_data) as.character(layer_data$label)))
+      record_moved_labels(object$assembly_state, object$plot_id, point_labels, "point label")
+      restyled_plot$layers <- restyled_plot$layers[!is_text_layer]
+    }
   }
   restyled_plot
 }

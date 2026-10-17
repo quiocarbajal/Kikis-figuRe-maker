@@ -50,6 +50,7 @@ panel_spec_columns <- c(
   "mapped_size_factor",    # multiplies sizes mapped to data (e.g. DotPlot dots); relative sizes kept
   "alpha",                 # fixed transparency of layers (0-1)
   "legend_position",       # none, right, left, top, bottom, inside
+  "legend_box_layout",     # vertical or horizontal: how several legends are arranged
   "heatmap_font_pt", "heatmap_row_font_pt", "heatmap_col_font_pt",
   "heatmap_cell_border",   # colour name, hex code, or NA for no border
   "euler_label_pt", "euler_quantity_pt",
@@ -58,7 +59,9 @@ panel_spec_columns <- c(
   "x_title_text", "y_title_text",
   "letter_dx_mm", "letter_dy_mm", # panel-letter offset from the plot corner
   "move_to_annotations",   # elements drawn as editable annotations instead of in the plot:
-                           # legend, strip labels (ggplot); set names (euler)
+                           # legend, strip labels, point labels (ggplot); set names (euler)
+  "moved_placed",          # written by the canvas build: moved elements already placed once,
+                           # never placed again (clear an entry to get a fresh copy)
   "notes"                  # latest plain-language instructions from the canvas
 )
 
