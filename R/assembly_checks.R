@@ -71,19 +71,117 @@ measure_line_widths <- function(svg_document) {
                                   page_geometry$millimetres_per_user_unit / millimetres_per_point, 3)
     )
   }) |>
+    # An SVG without stroked lines gives an empty table, not one without columns.
+    list_rbind(ptype = tibble(shape_type = character(), layer = character(), effective_line_pt = numeric()))
+}
+
+# Pixel width and height from the header of a PNG or JPEG file; NA for other
+# formats. svglite writes PNG, and Inkscape stores imported TIFF files as PNG.
+read_raster_pixel_size <- function(image_bytes, image_format) {
+  byte_values <- as.integer(image_bytes)
+  if (identical(image_format, "image/png") && length(byte_values) >= 24) {
+    return(c(width_px = sum(byte_values[17:20] * 256^(3:0)), height_px = sum(byte_values[21:24] * 256^(3:0))))
+  }
+  if (image_format %in% c("image/jpeg", "image/jpg")) {
+    # Walk the JPEG segments to the first start-of-frame segment, which holds
+    # the height and width.
+    start_of_frame_codes <- c(0xC0:0xC3, 0xC5:0xC7, 0xC9:0xCB, 0xCD:0xCF)
+    segment_start <- 3
+    while (segment_start + 8 <= length(byte_values) && byte_values[segment_start] == 0xFF) {
+      if (byte_values[segment_start + 1] %in% start_of_frame_codes) {
+        return(c(width_px = byte_values[segment_start + 7] * 256 + byte_values[segment_start + 8],
+                 height_px = byte_values[segment_start + 5] * 256 + byte_values[segment_start + 6]))
+      }
+      segment_start <- segment_start + 2 + byte_values[segment_start + 2] * 256 + byte_values[segment_start + 3]
+    }
+  }
+  c(width_px = NA_real_, height_px = NA_real_)
+}
+
+# One row per image element: how it is stored, its pixel size, where and how
+# large it is printed, and its effective resolution in dpi (image pixels per
+# inch at the printed size, after all transforms). raster_role names images
+# that are not pictures: "data cells" drawn with sharp pixels (ggplot2
+# geom_raster, heatmaps from other programs) and one-pixel "gradient strip"s
+# (colour-bar legends).
+measure_raster_images <- function(svg_document) {
+  page_geometry <- read_svg_page_geometry(svg_document)
+  image_nodes <- xml_find_all(svg_document, "//*[local-name()='image'][not(ancestor::*[local-name()='defs'])]")
+  if (length(image_nodes) == 0) {
+    return(tibble(layer = character(), plot_id = character(), image_id = character(), storage = character(),
+                  image_format = character(), width_px = numeric(), height_px = numeric(), x_mm = numeric(),
+                  y_mm = numeric(), printed_width_mm = numeric(), printed_height_mm = numeric(),
+                  effective_dpi = numeric(), is_stretched = logical(), raster_role = character()))
+  }
+  map(image_nodes, \(image_node) {
+    image_reference <- coalesce(xml_attr(image_node, "href"), "")
+    is_embedded <- str_starts(image_reference, "data:")
+    image_format <- if (is_embedded) tolower(str_match(image_reference, "^data:([^;,]+)")[1, 2]) else NA_character_
+    pixel_size <- c(width_px = NA_real_, height_px = NA_real_)
+    if (is_embedded && str_detect(image_reference, "^data:[^,]*;base64,")) {
+      encoded_image <- str_remove_all(str_remove(image_reference, "^data:[^,]*,"), "\\s")
+      if (identical(image_format, "image/png")) encoded_image <- str_sub(encoded_image, 1, 64) # header only
+      pixel_size <- read_raster_pixel_size(jsonlite::base64_dec(encoded_image), image_format)
+    }
+    # Element units per image pixel. With preserveAspectRatio="none" (written
+    # by Inkscape and svglite) the image fills its width and height; otherwise
+    # it keeps its proportions and fits inside them.
+    element_width <- coalesce(css_length_to_user_units(xml_attr(image_node, "width")), pixel_size[["width_px"]])
+    element_height <- coalesce(css_length_to_user_units(xml_attr(image_node, "height")), pixel_size[["height_px"]])
+    units_per_pixel_x <- element_width / pixel_size[["width_px"]]
+    units_per_pixel_y <- element_height / pixel_size[["height_px"]]
+    if (!str_starts(coalesce(xml_attr(image_node, "preserveAspectRatio"), "xMidYMid"), "none")) {
+      units_per_pixel_x <- units_per_pixel_y <- min(units_per_pixel_x, units_per_pixel_y)
+    }
+    image_transform <- cumulative_transform(image_node)
+    millimetres_per_pixel_x <- units_per_pixel_x * sqrt(image_transform[1, 1]^2 + image_transform[2, 1]^2) *
+      page_geometry$millimetres_per_user_unit
+    millimetres_per_pixel_y <- units_per_pixel_y * sqrt(image_transform[1, 2]^2 + image_transform[2, 2]^2) *
+      page_geometry$millimetres_per_user_unit
+    printed_box <- transformed_rectangle_mm(coalesce(css_length_to_user_units(xml_attr(image_node, "x")), 0),
+                                            coalesce(css_length_to_user_units(xml_attr(image_node, "y")), 0),
+                                            element_width, element_height, image_transform,
+                                            page_geometry$millimetres_per_user_unit)
+    image_rendering <- tolower(coalesce(read_inherited_style_property(image_node, "image-rendering"), "auto"))
+    plot_group <- xml_find_first(image_node, "ancestor::*[local-name()='g'][starts-with(@id, 'plot__')][1]")
+    tibble(
+      layer = coalesce(xml_attr(xml_find_first(image_node, "ancestor::*[@*[local-name()='groupmode']='layer'][1]"),
+                                "label"), NA_character_),
+      plot_id = str_remove(xml_attr(plot_group, "id"), "^plot__"),
+      image_id = xml_attr(image_node, "id"),
+      storage = if (is_embedded) "embedded" else "linked",
+      image_format = image_format,
+      width_px = pixel_size[["width_px"]],
+      height_px = pixel_size[["height_px"]],
+      x_mm = round(printed_box$x_mm, 1),
+      y_mm = round(printed_box$y_mm, 1),
+      printed_width_mm = round(pixel_size[["width_px"]] * millimetres_per_pixel_x, 2),
+      printed_height_mm = round(pixel_size[["height_px"]] * millimetres_per_pixel_y, 2),
+      effective_dpi = round(25.4 / max(millimetres_per_pixel_x, millimetres_per_pixel_y)),
+      is_stretched = abs(millimetres_per_pixel_x / millimetres_per_pixel_y - 1) > 0.01,
+      raster_role = case_when(
+        identical(image_format, "image/svg+xml") ~ "vector image",
+        image_rendering %in% c("pixelated", "optimizespeed", "crisp-edges") ~ "data cells",
+        isTRUE(min(pixel_size) == 1) ~ "gradient strip",
+        .default = "picture"
+      )
+    )
+  }) |>
     list_rbind()
 }
 
 #' Check a figure SVG against a journal preset
 #'
-#' @param ignore_layers Layers left out of the text and line checks (the boxes
-#'   layer holds notes, not figure content).
-#' @return A list: issues (one row per problem), text_sizes, line_widths.
+#' @param ignore_layers Layers left out of the text, line and image checks (the
+#'   boxes layer holds notes, not figure content).
+#' @return A list: issues (one row per problem), text_sizes, line_widths,
+#'   raster_images.
 check_figure_svg <- function(svg_path, journal_preset, ignore_layers = "boxes") {
   svg_document <- read_xml(svg_path)
   page_geometry <- read_svg_page_geometry(svg_document)
   text_sizes <- measure_text_sizes(svg_document) |> dplyr::filter(!layer %in% ignore_layers)
   line_widths <- measure_line_widths(svg_document) |> dplyr::filter(!layer %in% ignore_layers)
+  raster_images <- measure_raster_images(svg_document) |> dplyr::filter(!layer %in% ignore_layers)
   issues <- tibble(severity = character(), check = character(), detail = character())
   add_issue <- function(issues, severity, check_name, detail) {
     bind_rows(issues, tibble(severity = severity, check = check_name, detail = detail))
@@ -135,6 +233,55 @@ check_figure_svg <- function(svg_path, journal_preset, ignore_layers = "boxes") 
     issues <- add_issue(issues, "error", "linked image",
                         paste("Images linked to files instead of embedded:", paste(linked_images, collapse = ", ")))
   }
+  # Resolution and stretching are checked for pictures only (see
+  # measure_raster_images()); data cells and colour bars are drawn this way on purpose.
+  pictures <- dplyr::filter(raster_images, storage == "embedded", raster_role == "picture")
+  measured_pictures <- dplyr::filter(pictures, !is.na(effective_dpi))
+  describe_images <- function(image_rows) {
+    paste(sprintf("%s at x %.0f, y %.0f mm (layer %s%s): %.0f x %.0f px printed %.1f x %.1f mm, %.0f dpi",
+                  coalesce(image_rows$image_id, "image"), image_rows$x_mm, image_rows$y_mm,
+                  coalesce(image_rows$layer, "none"),
+                  if_else(is.na(image_rows$plot_id), "", paste0(", plot ", image_rows$plot_id)),
+                  image_rows$width_px, image_rows$height_px, image_rows$printed_width_mm,
+                  image_rows$printed_height_mm, image_rows$effective_dpi), collapse = "; ")
+  }
+  if (nrow(measured_pictures) < nrow(pictures)) {
+    issues <- add_issue(issues, "warning", "image resolution not measured", paste0(
+      "Pixel size is read from PNG and JPEG images only; not measured: ",
+      paste(unique(dplyr::filter(pictures, is.na(effective_dpi))$image_format), collapse = ", ")))
+  }
+  minimum_image_dpi <- as.numeric(journal_preset[["min_image_dpi"]] %||% NA)
+  recommended_image_dpi <- as.numeric(journal_preset[["recommended_image_dpi"]] %||% NA)
+  if (nrow(measured_pictures) > 0 && is.na(minimum_image_dpi)) {
+    issues <- add_issue(issues, "warning", "image resolution not checked", paste(
+      "The journal preset has no min_image_dpi (an older copy of journal_presets.tsv, or a value the journal",
+      "does not state)."))
+  }
+  if (!is.na(minimum_image_dpi)) {
+    low_resolution_pictures <- dplyr::filter(measured_pictures, effective_dpi < minimum_image_dpi)
+    if (nrow(low_resolution_pictures) > 0) {
+      issues <- add_issue(issues, "warning", "image below journal minimum", sprintf(
+        "%d images below %.0f dpi at printed size: %s", nrow(low_resolution_pictures), minimum_image_dpi,
+        describe_images(low_resolution_pictures)))
+    }
+    if (!is.na(recommended_image_dpi)) {
+      below_recommended_pictures <- dplyr::filter(measured_pictures, effective_dpi >= minimum_image_dpi,
+                                                  effective_dpi < recommended_image_dpi)
+      if (nrow(below_recommended_pictures) > 0) {
+        issues <- add_issue(issues, "warning", "image below journal recommendation", sprintf(
+          "%d images meet the %.0f dpi minimum but not the %.0f dpi the journal also recommends (see the preset notes): %s",
+          nrow(below_recommended_pictures), minimum_image_dpi, recommended_image_dpi,
+          describe_images(below_recommended_pictures)))
+      }
+    }
+  }
+  stretched_pictures <- dplyr::filter(measured_pictures, is_stretched)
+  if (nrow(stretched_pictures) > 0) {
+    issues <- add_issue(issues, "warning", "stretched image", sprintf(
+      paste("%d images are resized more in one direction than the other; fine when intended (e.g. a heatmap),",
+            "but it distorts a photograph, micrograph or blot: %s"),
+      nrow(stretched_pictures), describe_images(stretched_pictures)))
+  }
   permitted_widths <- as.numeric(na.omit(c(journal_preset$single_column_mm, journal_preset$one_and_half_column_mm,
                                            journal_preset$double_column_mm)))
   if (length(permitted_widths) > 0 && all(abs(page_geometry$page_width_mm - permitted_widths) > 0.5)) {
@@ -147,7 +294,7 @@ check_figure_svg <- function(svg_path, journal_preset, ignore_layers = "boxes") 
     issues <- add_issue(issues, "error", "page height", sprintf(
       "Page is %.1f mm tall; journal maximum is %.0f mm", page_geometry$page_height_mm, maximum_height_mm))
   }
-  list(issues = issues, text_sizes = text_sizes, line_widths = line_widths)
+  list(issues = issues, text_sizes = text_sizes, line_widths = line_widths, raster_images = raster_images)
 }
 
 # Short per-layer summary of the effective font sizes.

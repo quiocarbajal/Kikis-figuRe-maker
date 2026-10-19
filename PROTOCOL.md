@@ -13,7 +13,7 @@ Goal: every plot comes out of R at its final physical size, with text at the int
 
 | Term | Meaning |
 |---|---|
-| plot id | The knitr chunk label of a plot, e.g. `fig-3a-umap-by-genotype` |
+| plot id | The knitr chunk label of a plot, e.g. `fig-3a-umap-by-genotype`; for a panel not drawn by R, a name given to it, e.g. `external-3c-confocal-ko` |
 | `panel_specs.tsv` | One row per plot: figure, panel letter, position, size, font sizes, appearance settings, latest notes |
 | `figure_layout.tsv` | One row per figure: page width and height |
 | working canvas | `figure_assembly/drafting/<Figure>/round<N>_working.svg`, where you draft |
@@ -26,6 +26,7 @@ Goal: every plot comes out of R at its final physical size, with text at the int
 <paper_project>/
 ├── Figures.qmd                    ← draft_mode <- TRUE at the top
 ├── Figures/                       ← journal figures only (SVG + PDF)
+├── <exploration reports>.qmd      ← optional, anywhere in the project; tentative figures only
 └── figure_assembly/
     ├── R/                         ← toolkit copy (version in settings)
     ├── settings/
@@ -84,6 +85,7 @@ Code, `specs/` and `annotations/` reproduce every journal figure. `drafting/` ca
 Conventions in the figures document:
 
 - Set `embed-resources: true` under `format: html:`. Figure plots are written into `figure_assembly/drafting/`; without embedding, the HTML report only links to them and loses its images when `drafting/` is deleted.
+- If the document saves every plot to a folder of its own (a document-wide `fig.path`), every unmarked plot is also kept there at each render; Claude warns about this and offers to remove the setting.
 - One figure plot per chunk; the first plot of a chunk is the one assembled.
 - Chunk labels follow `figure_label_pattern` in `project_settings.tsv`. The default `^fig-(s?[0-9]+)` assigns `fig-3a-…` to Figure3 and `fig-s2b-…` to FigureS2. Chunks that do not match are left exactly as written.
 
@@ -93,7 +95,7 @@ Claude reads the plotting code and the journal preset, then chooses a starting s
 
 ## Step 3: the drafting loop
 
-1. **Render** the figures document with `draft_mode <- TRUE` (RStudio Render button). Draft plots go to `drafting/<Figure>/plots/`.
+1. **Render** the figures document with `draft_mode <- TRUE` (RStudio Render button, or ask Claude when the project's rules allow it). Draft plots go to `drafting/<Figure>/plots/`.
 2. **Build** the next working canvas with `build_figure_canvas("Figure3")`, or ask Claude. It holds four layers:
    - `plots`: locked; the R plots at their real size.
    - `panel_letters`: generated from the table and the journal preset.
@@ -115,6 +117,7 @@ Claude reads the plotting code and the journal preset, then chooses a starting s
    - For a box you draw yourself, start its note with `plot: <plot id>` and place the note inside the box.
    - Hide the `boxes` layer to see the plots without the note cards.
    - Add freehand content on the `annotations` layer only.
+   - For a panel not drawn by R (`plot_kind = external`), see "Panels not drawn by R".
    - Create text by clicking with the Text tool, not by dragging; dragging creates flowed text, which many programs cannot display.
 4. **Sync** by asking Claude to "update Figure 3":
    - The canvas is compared with the tables (`compare_canvas_with_tables()`), and positions and sizes are copied into `panel_specs.tsv`.
@@ -126,7 +129,40 @@ Claude reads the plotting code and the journal preset, then chooses a starting s
 
 1. Set `draft_mode <- FALSE` and render. Before anything is drawn, each figure's latest working canvas is compared with the tables. If they disagree, rendering stops and lists the differences, and you decide: sync the tables from the canvas, or keep the tables with `start_figure_assembly(draft_mode = FALSE, on_canvas_mismatch = "use_table")`.
 2. Build the journal figure with `build_figure_canvas("Figure3", "journal")` (plots, letters and annotations; no boxes), then export it with `export_figure_pdf("Figures/Figure3_journal.svg")`, which embeds fonts and keeps text as text. `export_figure_eps()` exists for journals that ask for EPS; EPS cannot store transparency.
-3. Check with `check_figure_svg()` (effective font sizes, line widths, fonts, stretched text, flowed text, linked images, page size) and `check_pdf_fonts()` (text is text, fonts embedded). The PDF check is a basic scan; when in doubt, confirm in Acrobat under File > Properties > Fonts.
+3. Check with `check_figure_svg()` (effective font sizes, line widths, fonts, stretched text, flowed text, linked images, image resolution, stretched images, page size) and `check_pdf_fonts()` (text is text, fonts embedded). The PDF check is a basic scan; when in doubt, confirm in Acrobat under File > Properties > Fonts.
+
+## Panels not drawn by R
+
+A panel that R does not draw (a micrograph, a blot, a deepTools PDF, a schematic made in another program) has `plot_kind = external`. It goes through the same rounds as an R plot, but you place its content by hand.
+
+1. **Declaring the panel.** Tell Claude about it, e.g. "3c is a confocal image, about 60 × 45 mm". There is no chunk to read, so Claude adds the row to `panel_specs.tsv`: a plot id that is the label of no chunk (Claude uses the prefix `external-`, e.g. `external-3c-confocal-ko`), the figure, the panel letter, `plot_kind = external`, and a position and size.
+2. **What each working canvas holds for it:** a box and a panel letter, but nothing on the `plots` layer. The box note lists only `plot:` and `notes:`. No setting lines apply, because R does not draw the content; requests about the content itself (e.g. a thicker scale bar) belong in the program that made it.
+3. **Placing the content, once, in Inkscape.** On the `annotations` layer, use File > Import:
+   - For a PNG, TIFF or JPEG, choose **Embed**, not Link. A linked image is only a path to a file on your computer; it is missing from the PDF you send.
+   - A PDF is imported as editable vector objects (text stays text).
+   - Scale and move the content to fill the box. Keep its proportions (lock icon between W and H in the toolbar), so a micrograph or blot is not stretched.
+4. **The box and the content are not tied.** Moving or resizing the box moves the panel letter in the next round, not the image. If you move one, move the other. Moving the panel to another figure leaves the image in the old figure's annotations; copy it across in Inkscape.
+5. **Sync** as usual ("update Figure 3"). The box goes into `panel_specs.tsv`; the image is saved with the rest of the `annotations` layer in `annotations/<Figure>_annotations.svg`. That file is the panel's only record: keep it. When the source image changes, delete the old copy on the latest canvas and import the new file.
+6. **Checks.** `check_figure_svg()` measures every embedded image at its printed size:
+   - **Resolution**, in dpi (image pixels per inch at the printed size). An image below the journal's minimum (`min_image_dpi` in the preset; 300 dpi for all six journals) gets a warning. Nature's own pages disagree: the final-submission page asks for at least 300 dpi, while its research figure guide asks for 450 dpi, so for Nature an image between 300 and 450 dpi gets a separate warning (`recommended_image_dpi`). Shrinking an image on the page raises its dpi; enlarging it lowers it. Resampling an image to more pixels raises the number but adds no detail, and Science does not permit it; export more pixels from the acquisition or analysis software instead.
+   - **Stretching.** An image resized more in one direction than the other gets a warning. Stretching is fine when intended (e.g. a heatmap), but it distorts a photograph, micrograph or blot.
+   - Images that are not pictures are left out of both checks: data cells drawn with sharp pixels (ggplot2 `geom_raster`, or a heatmap from another program saved that way) and one-pixel colour bars (ggplot2 colour-bar legends).
+   - Text in imported vector content (e.g. deepTools axis labels) is measured like any other text, so text that shrinks below the journal minimum when a PDF is scaled down is reported. Text inside a raster image cannot be measured or restyled.
+
+## Several source reports: tentative figures from exploration
+
+During exploration, the plots of a figure can come from several reports (`.qmd` or `.Rmd`), for example one per data type. They are assembled into **tentative figures** with the same drafting loop (Step 3). Final figures are always drawn by the figures document; exploration reports never render with `draft_mode <- FALSE`.
+
+1. **Turning the toolkit on in a report.** A report takes part only if it contains the setup chunk of Step 1, the hidden chunk that loads the toolkit. In an exploration report, `draft_mode` stays `TRUE`, because exploration reports never make final figures. All reports live inside the paper project folder, and `execute-dir: project` makes each report run from that folder, so the same setup chunk finds the one shared `figure_assembly/` folder from every report. Set `embed-resources: true` in each report's header, as for the figures document: the plots of marked chunks are written into `figure_assembly/drafting/`, which later renders overwrite, so the HTML must hold its own copy. If a report saves every plot to a folder of its own (a report-wide `fig.path`, e.g. `fig.path = "./Figures/"` in `knitr::opts_chunk$set()`, in the report's header, or in `_quarto.yml`), every unmarked plot is also kept as a file in that folder at each render. Claude warns about this when it adds the setup chunk and offers to remove that setting; files already in the folder stay until you delete them.
+2. **Marking a plot.** As in the figures document: a chunk is a figure plot when its label matches `figure_label_pattern` (e.g. `fig-3a-umap-by-genotype`) or has a row in `panel_specs.tsv`. knitr writes every plot to a file. For other chunks, that file sits in the temporary `<report>_files/` folder, which Quarto deletes after copying the image into the HTML (with `embed-resources: true`), so those plots exist only in the HTML report. For marked chunks, the toolkit writes the file into `figure_assembly/drafting/<Figure>/plots/`, where it stays. A marked plot appears in the report at its figure size and fonts.
+3. **A chunk that draws several plots.** All plots of a marked chunk go into the figure as one panel. knitr writes one file per plot (`<label>-1.svg`, `<label>-2.svg`, …), but only the first file of a chunk is assembled, so the chunk must draw its plots as one combined plot, in R: each plot gets its placeholder, and the chunk ends with one combining call, e.g. `gridExtra::grid.arrange(grobs = plot_list, nrow = 1)` or `patchwork::wrap_plots(plot_list)` (the trial's Figure 3e chunk does this with three Euler plots). The combined plot is one panel with one box; its size and settings apply to all its plots alike, and the HTML report shows the combined plot. Claude spots such chunks (a loop that draws plots, or a `-2.svg` written by the latest render) and proposes the combining line; the plots themselves stay as they are.
+4. **Unique plot ids.** knitr checks chunk labels only within one document. Before every "update Figure N", Claude searches all reports that load the toolkit for duplicate figure labels and stops if it finds one. These checks run only when you talk to Claude: a duplicate rendered in between overwrites the other report's plot file in `drafting/`, and re-rendering that report restores it.
+5. **Drafting.** Step 3 is unchanged, except that its item 1 means rendering every report that draws a plot of the figure. Do not cache plotting chunks (`cache: true`): a cached chunk may not be re-run when only `panel_specs.tsv` changed, so new settings would not be applied. Heavy computation chunks may be cached.
+6. **Moving a panel** to another letter or figure: ask Claude, e.g. "move the UMAP to 4b". Claude first syncs the latest canvases (Step 3, item 4), then renames the chunk label and the table row, and shows the diff. The report is rendered, by you or by Claude when the project's rules allow it or you ask, and Claude builds new rounds of the figures involved. Annotations do not follow a plot to another figure: freehand content and moved elements stay in the old figure. Copy them across in Inkscape, or ask Claude for fresh copies of the moved elements in the new figure (it clears `moved_placed`).
+7. **From tentative to final.** When a tentative figure is accepted, its plotting code is copied into the figures document with the labels unchanged, by you or, on request, verbatim by Claude. How the data reach the figures document is outside this protocol. Claude then renames the label of the copy left in the exploration report (e.g. `explored-fig-3a-umap-by-genotype`), so that only one document draws each plot id; that plot returns to the report's own size in its HTML. Then Claude compares the plots of the final figure with those of the tentative figure:
+   - **Same plots** (same plot ids): the last settings of the tentative figure are used. Table rows and annotations carry over. Claude says so, builds the next round with the plots from the figures document, and lists annotations that may no longer fit (e.g. an arrow pointing at a cluster that moved).
+   - **Plots added, removed or replaced:** Claude shows what changed and asks whether to keep the tentative settings for the plots that remain, or to start fresh. Starting fresh means that Claude empties the positions, sizes and settings in the figure's rows of `panel_specs.tsv` (which plots belong to the figure, and their panel letters, stay) and proposes a new first layout (Step 2). Every build copies `annotations/<Figure>_annotations.svg` into the new round, so Claude asks before renaming that file (e.g. to `<Figure>_annotations_tentative.svg`); once renamed, it is kept but no longer used.
+8. **Leftovers.** Before the final render, Claude lists `panel_specs.tsv` rows whose plot id is the label of no chunk in any report and proposes deleting them. Rows with `plot_kind = external` are left out of this list: they have no chunk by design. A leftover figure whose latest canvas disagrees with the tables can stop the final render.
 
 ## Changing journal after a figure is finished
 
@@ -136,7 +172,7 @@ Claude reads the plotting code and the journal preset, then chooses a starting s
 
 ## Journal presets
 
-`presets/journal_presets.tsv` holds Nature, Nature Communications, Cell Press, Science, PNAS and eLife, checked on 2026-10-16. The `source_url` and `notes` columns say where each value comes from; values from archived pages and toolkit defaults are marked in `notes`. None of these journals lists SVG as an accepted format, so the deliverable is a vector PDF with embedded fonts and live text. Add or edit rows as needed.
+`presets/journal_presets.tsv` holds Nature, Nature Communications, Cell Press, Science, PNAS and eLife, checked on 2026-10-16. The `source_url` and `notes` columns say where each value comes from; values from archived pages and toolkit defaults are marked in `notes`. None of these journals lists SVG as an accepted format, so the deliverable is a vector PDF with embedded fonts and live text. `min_image_dpi` is the journal's minimum for photographs and other continuous-tone images at printed size, checked on 2026-10-19; text and lines stay vector in this toolkit, so the higher minimums that journals set for raster line art do not apply to them. `recommended_image_dpi` is filled only where a journal also asks for more (Nature: 450 dpi). Add or edit rows as needed.
 
 ## Known limitations (version 0.1.0)
 
