@@ -37,7 +37,7 @@ Then follow `PROTOCOL.md`, step 1.
 
 ## Status
 
-Version 0.1.0, first draft. Tested end to end with emulated knitr chunks (installation, round-0 layout, drafting rounds with edits made by Inkscape, sync, final render, journal SVG, PDF export and checks) and with a real Quarto render of the example document. Not yet tested on a full research figures document.
+Version 0.1.0, first draft. Tested end to end with emulated knitr chunks (installation, round-0 layout, drafting rounds with edits made by Inkscape, sync, final render, journal SVG, PDF export and checks) and with a real Quarto render of the example document, and in use on a full research figures document (one figure finished, one in drafting).
 
 ## License
 

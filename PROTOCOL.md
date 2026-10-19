@@ -176,9 +176,11 @@ During exploration, the plots of a figure can come from several reports (`.qmd` 
 
 ## Known limitations (version 0.1.0)
 
-- Tested with emulated knitr chunks and with a real Quarto render of `examples/example_figures.qmd`; not yet tested on a full research figures document.
+- Tested with emulated knitr chunks, with a real Quarto render of `examples/example_figures.qmd`, and on a full research figures document (one figure finished, one in drafting).
 - One figure plot per chunk.
 - Base-R plots without a wrapper are sized and placed but not restyled.
 - UpSetR font size is a multiplier (`upset_text_scale`), not points.
 - `& figure_style()` on patchwork objects is untested.
 - Text drawn by plots that are not ggplot2, pheatmap, eulerr or UpSetR is not restyled.
+- Image resolution is measured for embedded PNG and JPEG images only; Inkscape stores imported TIFF files as PNG.
+- A heatmap stored as a smooth image (e.g. a deepTools heatmap imported from a PDF) is checked like a photograph, so stretching it on purpose gives a "stretched image" warning.
