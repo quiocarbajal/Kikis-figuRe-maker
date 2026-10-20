@@ -7,6 +7,8 @@ description: Assemble paper figures from R plots with the figure-assembly toolki
 
 Read `PROTOCOL.md` in the toolkit repository for the full workflow. This file tells Claude how to take part.
 
+Before acting on a request, check `GOTCHAS.md` in the toolkit repository: places where the natural first approach is known to fail.
+
 ## Non-negotiable boundary
 
 This skill changes **appearance only**. Permitted: plot size and position, font sizes and family, axis line and tick widths, layer line widths, fixed point size, fixed transparency, legend position or removal, panel letters, and annotation text style.
@@ -84,3 +86,4 @@ Exploration reports feed tentative figures; final figures come only from the fig
 - Never hand-edit generated SVGs; regenerate them.
 - `drafting/` is disposable; `specs/`, `annotations/` and the figures document are the record.
 - A document-wide `fig.path` keeps every unmarked plot as a file (`report_fig_path` in `check_project()`). Warn about it when setting up any figures document, and offer to remove it.
+- When your natural first approach fails in real use and another one works (or none does), propose a `GOTCHAS.md` entry in the same two-part format. Save it only after the user agrees.

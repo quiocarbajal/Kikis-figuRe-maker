@@ -14,6 +14,7 @@ Inspired by [FigureFirst](https://github.com/FlyRanch/figurefirst) (Python) and 
 | Path | What it is |
 |---|---|
 | `PROTOCOL.md` | The step-by-step protocol (start here) |
+| `GOTCHAS.md` | Places where the natural first approach fails, and what works instead |
 | `R/assembly_*.R` | The toolkit code, copied into each paper project |
 | `presets/journal_presets.tsv` | Figure specifications for Nature, Nature Communications, Cell Press, Science, PNAS, eLife |
 | `templates/figure_assembly/` | Empty folder structure copied into each paper project |
@@ -23,7 +24,7 @@ Inspired by [FigureFirst](https://github.com/FlyRanch/figurefirst) (Python) and 
 
 ## Requirements
 
-- R 4.1 or newer with `tidyverse`, `xml2`, `svglite` and `knitr`; optionally `pheatmap`, `eulerr` and `UpSetR`.
+- R 4.1 or newer with `tidyverse` (ggplot2 4.0.0 or newer), `xml2`, `svglite` and `knitr`; optionally `pheatmap`, `eulerr` and `UpSetR`.
 - Inkscape 1.x (tested with 1.4.4) for previews and PDF export.
 
 ## Quick start
