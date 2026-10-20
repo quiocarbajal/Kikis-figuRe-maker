@@ -30,12 +30,20 @@ Inspired by [FigureFirst](https://github.com/FlyRanch/figurefirst) (Python) and 
 
 ## Quick start
 
-```r
-for (toolkit_file in list.files("R", pattern = "\\.R$", full.names = TRUE)) source(toolkit_file)
-install_figure_assembly("path/to/paper_project", ".", journal_id = "nature_communications")
-```
+1. Clone the repository:
 
-Then follow `PROTOCOL.md`, step 1.
+   ```bash
+   git clone https://github.com/quiocarbajal/Kikis-figuRe-maker.git
+   ```
+
+2. In R, install the toolkit into your paper project, where `<toolkit>` is the cloned folder:
+
+   ```r
+   for (toolkit_file in list.files("<toolkit>/R", pattern = "\\.R$", full.names = TRUE)) source(toolkit_file)
+   install_figure_assembly("path/to/paper_project", "<toolkit>", journal_id = "nature_communications")
+   ```
+
+3. Then follow `PROTOCOL.md`, step 1, from item 2.
 
 ## Status
 
