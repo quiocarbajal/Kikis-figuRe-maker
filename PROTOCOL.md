@@ -37,7 +37,7 @@ Goal: every plot comes out of R at its final physical size, with text at the int
     │   └── panel_specs.tsv
     ├── annotations/<Figure>_annotations.svg   ← freehand content (keep)
     └── drafting/                  ← disposable
-        ├── project_checks.md      ← record of the last render
+        ├── project_checks/        ← record of each report's last render
         └── <Figure>/plots/, final_plots/, round<N>_working.svg
 ```
 
@@ -128,7 +128,7 @@ Claude reads the plotting code and the journal preset, then chooses a starting s
 
 ## Step 4: the final figure
 
-1. Set `draft_mode <- FALSE` and render. Before anything is drawn, the project checks run (see "Project checks"), and each figure's latest working canvas is compared with the tables. If they disagree, rendering stops and lists the differences (also recorded in `drafting/project_checks.md`), and you decide: sync the tables from the canvas, or keep the tables with `start_figure_assembly(draft_mode = FALSE, on_canvas_mismatch = "use_table")`.
+1. Set `draft_mode <- FALSE` and render. Before anything is drawn, the project checks run (see "Project checks"), and each figure's latest working canvas is compared with the tables. If they disagree, rendering stops and lists the differences (also recorded in the report's file in `drafting/project_checks/`), and you decide: sync the tables from the canvas, or keep the tables with `start_figure_assembly(draft_mode = FALSE, on_canvas_mismatch = "use_table")`.
 2. Build the journal figure with `build_figure_canvas("Figure3", "journal")` (plots, letters and annotations; no boxes), then export it with `export_figure_pdf("Figures/Figure3_journal.svg")`, which embeds fonts and keeps text as text. `export_figure_eps()` exists for journals that ask for EPS; EPS cannot store transparency.
 3. Check with `check_figure_svg()` (effective font sizes, line widths, fonts, stretched text, flowed text, linked images, image resolution, stretched images, page size) and `check_pdf_fonts()` (text is text, fonts embedded). The PDF check is a basic scan; when in doubt, confirm in Acrobat under File > Properties > Fonts.
 
@@ -146,7 +146,7 @@ Claude reads the plotting code and the journal preset, then chooses a starting s
 | `stale_plot_files` | note | Numbered plot files (`-2.svg`, …) left by an earlier render. They are not used. |
 
 - **At every render**, `start_figure_assembly()` runs the checks and writes the problems and warnings to the render log (RStudio's Background Jobs pane, or the terminal that runs `quarto render`), followed by the number of notes. The HTML report does not show them, because the setup chunk is hidden. A figure chunk that draws several plots is also reported in the log right after it runs.
-- **The record of the last render:** every render also rewrites `figure_assembly/drafting/project_checks.md`, for people and AI assistants who did not see the render log. It records which report was rendered, in which mode and when, and every finding, notes included. During the render it adds the figure chunks that drew several plots, the canvas comparisons of a final render, and the reason a final render stopped. It is written only during a render, so running the setup chunk in the console does not replace it. A render that ends early for another reason (e.g. an error in the analysis code) leaves no entry.
+- **The record of each report's last render:** every render also rewrites that report's file in `figure_assembly/drafting/project_checks/`, for people and AI assistants who did not see the render log. There is one file per report, named after its path in the project with `/` as `__` (e.g. `Figures.qmd.md`, `exploration__RNAseq.qmd.md`), so rendering one report never erases another report's record. Each file records the mode and time of the render, and every finding, notes included; the findings cover the whole project, so a file whose report has not been rendered for a while holds older findings. During the render it adds the figure chunks that drew several plots, the canvas comparisons of a final render, and the reason a final render stopped. It is written only during a render, so running the setup chunk in the console does not replace it. A render that ends early for another reason (e.g. an error in the analysis code) leaves no entry.
 - **A final render stops** (`draft_mode <- FALSE`) on a duplicate figure label, before anything is drawn, and at a figure chunk that draws several plots, but only for figures that have a working canvas. For figures not yet drafted, problems are written to the log and the render continues, so a figure in progress never blocks finishing another.
 - **By hand or by Claude:** run `check_project()` from the project folder. It prints every finding, notes included, and returns them as a table (`check_id`, `severity`, `location`, `plot_id`, `finding`, `suggested_action`).
 - **Before renaming a chunk:** `find_plot_id_references("<plot id>")` lists every line of every report that mentions the plot id: its chunk label, `@` cross-references, chunk options such as `ref.label` and `dependson`, and any other mention.

@@ -204,11 +204,11 @@ start_figure_assembly <- function(draft_mode = TRUE,
   figure_layout <- read_figure_layout(file.path(assembly_directory, "specs", "figure_layout.tsv"))
 
   # Reports, labels and plot files (assembly_project_checks.R); findings go to
-  # the render log and to drafting/project_checks.md.
+  # the render log and to this report's file in drafting/project_checks/.
   project_findings <- run_project_checks_at_render(assembly_directory, draft_mode)
 
   if (!draft_mode) {
-    # Its messages and its stop reason are also recorded in drafting/project_checks.md:
+    # Its messages and its stop reason are also recorded in drafting/project_checks/:
     # from the hidden setup chunk they reach neither the report nor the render log.
     withCallingHandlers(
       stop_if_canvases_disagree_with_tables(assembly_directory, panel_specs, figure_layout, on_canvas_mismatch),

@@ -6,11 +6,12 @@
 # reports: it never deletes files, edits a report, or changes a table.
 #
 # start_figure_assembly() runs it at every render and writes the findings to
-# the render log and to figure_assembly/drafting/project_checks.md, the record
-# of the last render for people and AI assistants who did not see the log. A
-# final render (draft_mode = FALSE) stops on a figure label used by more than
-# one chunk, and at a figure chunk that draws several plots
-# (make_plot_count_hook()), but only for figures that have a working canvas.
+# the render log and to a file in figure_assembly/drafting/project_checks/,
+# one per report: the record of that report's last render, for people and AI
+# assistants who did not see the log. A final render (draft_mode = FALSE)
+# stops on a figure label used by more than one chunk, and at a figure chunk
+# that draws several plots (make_plot_count_hook()), but only for figures that
+# have a working canvas.
 #
 # Reports are read as text, without running knitr: chunk labels made by code
 # and chunks in child documents are not seen (PROTOCOL.md, Known limitations).
@@ -357,12 +358,21 @@ find_plot_id_references <- function(plot_id, project_directory = ".") {
 
 # ---- Findings file -----------------------------------------------------------
 
-# The record of the last render: which report, which mode, what the checks
-# found, and what happened during the render. Rewritten at every render (and
-# only during a render, so running the setup chunk in the console does not
-# replace it). The render log shows the same findings, but nobody may read it.
+# The record of a report's last render: which mode, what the checks found, and
+# what happened during the render. One file per report, so rendering one report
+# never erases another's record (e.g. why a final render stopped). Rewritten at
+# every render of that report, and only during a render, so running the setup
+# chunk in the console does not replace it. The render log shows the same
+# findings, but nobody may read it.
+project_checks_folder <- function(assembly_directory) {
+  file.path(assembly_directory, "drafting", "project_checks")
+}
+
+# The file of the report being rendered: its path in the project with "/" as
+# "__", e.g. Figures.qmd.md or exploration__RNAseq.qmd.md.
 project_checks_file_path <- function(assembly_directory) {
-  file.path(assembly_directory, "drafting", "project_checks.md")
+  report_path <- rendered_report_path(dirname(normalizePath(assembly_directory)))
+  file.path(project_checks_folder(assembly_directory), paste0(str_replace_all(report_path, "/", "__"), ".md"))
 }
 
 # The report being rendered, relative to the project folder.
@@ -378,14 +388,16 @@ rendered_report_path <- function(project_directory) {
 write_project_checks_file <- function(assembly_directory, project_directory, project_findings, draft_mode) {
   project_settings <- read_project_settings(file.path(assembly_directory, "settings", "project_settings.tsv"))
   file_lines <- c(
-    "# Figure assembly checks at the last render", "",
-    paste0("Written by start_figure_assembly() at every render and replaced at the next one. ",
-           "Run check_project() for a fresh list."), "",
+    "# Figure assembly checks at the last render of this report", "",
+    paste0("Written by start_figure_assembly() at every render of this report and replaced at its next ",
+           "render. Each report that loads the toolkit has its own file in this folder. Run ",
+           "check_project() for a fresh list."), "",
     paste0("- Report: ", rendered_report_path(project_directory)),
     paste0("- Mode: ", if (draft_mode) "draft (draft_mode = TRUE)" else "final (draft_mode = FALSE)"),
     paste0("- Started: ", format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z")),
     paste0("- Toolkit version: ", coalesce(na_if(project_settings$toolkit_version %||% "", ""), "unknown")), "",
     "## At the start of the render", "",
+    "These checks cover the whole project, not only this report.", "",
     format_check_findings(project_findings), "",
     "## Events during the render", "",
     paste0("Canvas comparisons of a final render, figure chunks that drew more than one plot, and the reason ",
