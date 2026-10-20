@@ -307,9 +307,10 @@ normalise_note <- function(note_text) {
   paste(note_lines, collapse = " | ")
 }
 
-# Differences between a canvas and the tables. A change to a box wins over a
-# change to its plot; if both moved to different places, the box is used and
-# the conflict is reported.
+# Differences between a canvas and the tables. Positions and sizes come only
+# from the boxes. A plot moved or resized on the canvas itself (instead of its
+# box) is ignored and listed in moved_plots, so it can be reported: the next
+# round redraws the plot at its box.
 compare_canvas_with_tables <- function(canvas_path, panel_specs, figure_layout, figure_name) {
   canvas_boxes <- read_canvas_boxes(canvas_path)
   plot_positions <- read_canvas_plot_positions(canvas_path)
@@ -318,29 +319,25 @@ compare_canvas_with_tables <- function(canvas_path, panel_specs, figure_layout, 
   matched_boxes <- dplyr::filter(canvas_boxes, !is.na(plot_id), plot_id %in% panel_specs$plot_id)
   unmatched_boxes <- dplyr::filter(canvas_boxes, is.na(plot_id) | !plot_id %in% panel_specs$plot_id)
 
+  moved_plots <- tibble(plot_id = character(), field = character(), placed_value = double(), canvas_value = double())
+  if (!is.null(plot_positions) && nrow(plot_positions) > 0) {
+    moved_plots <- map(geometry_fields, \(field_name) {
+      dplyr::filter(plot_positions, plot_id %in% panel_specs$plot_id) |>
+        transmute(plot_id, field = field_name, placed_value = .data[[paste0("placed_", field_name)]],
+                  canvas_value = round(.data[[field_name]], 2))
+    }) |>
+      list_rbind() |>
+      dplyr::filter(!is.na(placed_value), abs(canvas_value - placed_value) > position_tolerance_mm)
+  }
+
   differences <- map(seq_len(nrow(matched_boxes)), \(box_index) {
     canvas_box <- matched_boxes[box_index, ]
-    plot_position <- dplyr::filter(plot_positions, plot_id == canvas_box$plot_id)
     field_differences <- map(geometry_fields, \(field_name) {
       table_value <- lookup_panel_spec(panel_specs, canvas_box$plot_id, field_name, default = NA_real_)
       box_value <- canvas_box[[field_name]]
-      plot_value <- if (nrow(plot_position) == 1) plot_position[[field_name]] else NA_real_
-      placed_value <- if (nrow(plot_position) == 1) plot_position[[paste0("placed_", field_name)]] else NA_real_
-      box_changed <- is.na(table_value) || abs(box_value - table_value) > position_tolerance_mm
-      plot_changed <- !is.na(plot_value) && !is.na(placed_value) &&
-        abs(plot_value - placed_value) > position_tolerance_mm &&
-        (is.na(table_value) || abs(plot_value - table_value) > position_tolerance_mm)
-      if (box_changed) {
-        source_description <- if (plot_changed && abs(plot_value - box_value) > position_tolerance_mm) {
-          "box (plot was also moved, to a different place)"
-        } else {
-          "box"
-        }
+      if (is.na(table_value) || abs(box_value - table_value) > position_tolerance_mm) {
         tibble(plot_id = canvas_box$plot_id, field = field_name, table_value = as.character(table_value),
-               canvas_value = as.character(round(box_value, 2)), source = source_description)
-      } else if (plot_changed) {
-        tibble(plot_id = canvas_box$plot_id, field = field_name, table_value = as.character(table_value),
-               canvas_value = as.character(round(plot_value, 2)), source = "plot")
+               canvas_value = as.character(round(box_value, 2)), source = "box")
       } else {
         NULL
       }
@@ -396,7 +393,7 @@ compare_canvas_with_tables <- function(canvas_path, panel_specs, figure_layout, 
     dplyr::filter(is.na(table_value) | abs(canvas_value - table_value) > position_tolerance_mm)
 
   list(canvas_path = canvas_path, differences = differences,
-       unmatched_boxes = unmatched_boxes, page_differences = page_differences)
+       unmatched_boxes = unmatched_boxes, page_differences = page_differences, moved_plots = moved_plots)
 }
 
 has_canvas_differences <- function(canvas_comparison) {
@@ -425,6 +422,21 @@ format_canvas_comparison <- function(canvas_comparison) {
   paste(report_lines, collapse = "\n")
 }
 
+# Plots moved or resized on the canvas itself are ignored (the box decides) but
+# reported, because the next round redraws each plot at its box. Empty when no
+# plot was moved.
+format_moved_plots <- function(canvas_comparison) {
+  moved_plots <- canvas_comparison$moved_plots
+  if (is.null(moved_plots) || nrow(moved_plots) == 0) {
+    return(character())
+  }
+  c(sprintf(paste0("Plots moved or resized on the canvas itself, not through their boxes (%s). Ignored: ",
+                   "the box decides, and the next round redraws each plot at its box. Move or resize ",
+                   "the box instead."), canvas_comparison$canvas_path),
+    sprintf("  %s  %s  placed: %s  canvas: %s", moved_plots$plot_id, moved_plots$field,
+            round(moved_plots$placed_value, 2), moved_plots$canvas_value))
+}
+
 # Used by start_figure_assembly(draft_mode = FALSE): nothing is chosen silently.
 stop_if_canvases_disagree_with_tables <- function(assembly_directory, panel_specs, figure_layout,
                                                   on_canvas_mismatch) {
@@ -438,8 +450,12 @@ stop_if_canvases_disagree_with_tables <- function(assembly_directory, panel_spec
     canvas_comparison <- compare_canvas_with_tables(
       canvas_path, dplyr::filter(panel_specs, figure == figure_name), figure_layout, figure_name
     )
+    moved_plot_report <- format_moved_plots(canvas_comparison)
+    if (!has_canvas_differences(canvas_comparison) && length(moved_plot_report) > 0) {
+      message(paste(moved_plot_report, collapse = "\n"))
+    }
     if (has_canvas_differences(canvas_comparison)) {
-      comparison_report <- format_canvas_comparison(canvas_comparison)
+      comparison_report <- paste(c(format_canvas_comparison(canvas_comparison), moved_plot_report), collapse = "\n")
       if (on_canvas_mismatch == "stop") {
         stop(comparison_report,
              "\nNothing was rendered. Choose one: update the tables from the canvas (ask Claude, or use ",

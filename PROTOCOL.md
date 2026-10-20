@@ -121,7 +121,7 @@ Claude reads the plotting code and the journal preset, then chooses a starting s
    - For a panel not drawn by R (`plot_kind = external`), see "Panels not drawn by R".
    - Create text by clicking with the Text tool, not by dragging; dragging creates flowed text, which many programs cannot display.
 4. **Sync** by asking Claude to "update Figure 3":
-   - The canvas is compared with the tables (`compare_canvas_with_tables()`), and positions and sizes are copied into `panel_specs.tsv`.
+   - The canvas is compared with the tables (`compare_canvas_with_tables()`), and positions and sizes are copied into `panel_specs.tsv`. They always come from the boxes. A plot moved or resized on the canvas itself, instead of its box, is ignored and reported to you, because the next round redraws it at its box.
    - Setting lines are applied to the table by code. Claude translates the free-text requests into table values, e.g. "dots smaller" → `point_size_ggplot = 0.6`. Anything that would change the analysis is refused.
    - The annotations layer is copied to `annotations/<Figure>_annotations.svg`.
 5. Repeat from 1 until satisfied. Each round is a new file; earlier rounds can be deleted.
