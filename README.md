@@ -14,7 +14,7 @@ Inspired by [FigureFirst](https://github.com/FlyRanch/figurefirst) (Python) and 
 | Path | What it is |
 |---|---|
 | `PROTOCOL.md` | The step-by-step protocol (start here) |
-| `FLOWCHARTS.md` | Flow charts of the protocol and a table of its safety checks, for an overview first |
+| [`FLOWCHARTS.md`](FLOWCHARTS.md) | Flow charts of the protocol and a table of its safety checks, for an overview first |
 | `GOTCHAS.md` | Places where the natural first approach fails, and what works instead |
 | `R/assembly_*.R` | The toolkit code, copied into each paper project |
 | `presets/journal_presets.tsv` | Figure specifications for Nature, Nature Communications, Cell Press, Science, PNAS, eLife |
@@ -36,7 +36,7 @@ Inspired by [FigureFirst](https://github.com/FlyRanch/figurefirst) (Python) and 
    git clone https://github.com/quiocarbajal/Kikis-figuRe-maker.git
    ```
 
-2. In R, install the toolkit into your paper project, where `<toolkit>` is the cloned folder:
+2. In R, install the toolkit into your paper project, where `<toolkit>` is the cloned folder's path:
 
    ```r
    for (toolkit_file in list.files("<toolkit>/R", pattern = "\\.R$", full.names = TRUE)) source(toolkit_file)
