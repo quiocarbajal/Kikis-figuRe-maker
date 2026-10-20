@@ -168,6 +168,8 @@ make_chunk_option_hook <- function(panel_specs, project_settings, assembly_direc
     assembly_state$moved_labels[[plot_id]] <- NULL
     chunk_options$dev <- "svglite"
     chunk_options$dev.args <- list(fix_text_size = FALSE, bg = "transparent")
+    # Turns on the plot-count check after the chunk (make_plot_count_hook()).
+    chunk_options$figure_assembly_plot_count <- figure_name
     width_mm <- lookup_panel_spec(panel_specs, plot_id, "width_mm", default = NA_real_)
     height_mm <- lookup_panel_spec(panel_specs, plot_id, "height_mm", default = NA_real_)
     if (!is.na(width_mm)) chunk_options$fig.width <- millimetre_to_inch(width_mm)
@@ -201,8 +203,21 @@ start_figure_assembly <- function(draft_mode = TRUE,
   panel_specs <- read_panel_specs(file.path(assembly_directory, "specs", "panel_specs.tsv"))
   figure_layout <- read_figure_layout(file.path(assembly_directory, "specs", "figure_layout.tsv"))
 
+  # Reports, labels and plot files (assembly_project_checks.R); findings go to
+  # the render log and to drafting/project_checks.md.
+  project_findings <- run_project_checks_at_render(assembly_directory, draft_mode)
+
   if (!draft_mode) {
-    stop_if_canvases_disagree_with_tables(assembly_directory, panel_specs, figure_layout, on_canvas_mismatch)
+    # Its messages and its stop reason are also recorded in drafting/project_checks.md:
+    # from the hidden setup chunk they reach neither the report nor the render log.
+    withCallingHandlers(
+      stop_if_canvases_disagree_with_tables(assembly_directory, panel_specs, figure_layout, on_canvas_mismatch),
+      message = function(canvas_message) record_render_event(assembly_directory, conditionMessage(canvas_message)),
+      error = function(canvas_error) {
+        record_render_event(assembly_directory, paste0("Final render stopped before anything was drawn: ",
+                                                       conditionMessage(canvas_error)))
+      }
+    )
   }
 
   # Shared by the hook and the placeholders during one render.
@@ -214,6 +229,7 @@ start_figure_assembly <- function(draft_mode = TRUE,
     knitr::opts_hooks$set(fig.width = make_chunk_option_hook(
       panel_specs, project_settings, assembly_directory, draft_mode, assembly_state
     ))
+    knitr::knit_hooks$set(figure_assembly_plot_count = make_plot_count_hook(assembly_directory, draft_mode))
   }
 
   font_family <- project_settings$font_family
@@ -294,6 +310,7 @@ start_figure_assembly <- function(draft_mode = TRUE,
     panel_specs = panel_specs,
     figure_layout = figure_layout,
     project_settings = project_settings,
+    project_findings = project_findings,
     draft_mode = draft_mode
   )
 }

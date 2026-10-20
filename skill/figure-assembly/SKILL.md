@@ -22,7 +22,7 @@ Use the toolkit (`read_canvas_boxes()`, `read_canvas_plot_positions()`, `compare
 ## "Build / update Figure N"
 
 1. Load the toolkit from `figure_assembly/R/`, with the project folder as the working directory.
-2. Find every report that loads the toolkit: `.qmd` and `.Rmd` files in the paper project that call `start_figure_assembly(`. If two of them share a chunk label that belongs to a figure, stop and report both files; the plot file in `drafting/` comes from whichever was rendered last. For each plot of the figure, check whether its chunk draws several plots: a `<plot_id>-2.svg` at least as new as `<plot_id>-1.svg`. Older numbered files are leftovers of earlier renders; propose deleting them. If the chunk draws several plots, only `-1.svg` is assembled: propose combining them, as under "Several source reports".
+2. Read `figure_assembly/drafting/project_checks.md` if it exists: the record of the last render (report, mode, time, findings, chunks that drew several plots, canvas comparisons, and why a final render stopped). The user rarely reads the render log, so tell them anything there they may not have seen, such as a final render that stopped. Then run `check_project()` (PROTOCOL.md, "Project checks") and report its findings for this figure in plain language, problems first. `duplicate_label`: stop and report both files; the plot file in `drafting/` comes from whichever was rendered last. `multi_plot_chunk`: only `-1.svg` is assembled; propose combining the plots, as under "Several source reports". `stale_plot_files`: propose deleting them. `leftover_row` and `report_fig_path`: as under "Several source reports". Act on a finding (delete files, edit a report or a table) only after the user agrees.
 3. If a working canvas exists, run `compare_canvas_with_tables()` on the latest one and report the differences in plain language.
 4. Setting lines with known names (see `box_note_settings` in `R/assembly_canvas.R`) are already exact table differences; report any marked "NOT applied" back to the user. Translate only the free-text requests (field `notes`) into values of existing `panel_specs.tsv` columns, for example:
    - "axis text 5 pt" → `axis_text_pt = 5`
@@ -50,7 +50,7 @@ Wording changes (`title text`, `y axis title text`, …): warn, and do not apply
 
 ## Final figure
 
-Never build the journal figure while the latest canvas and the tables disagree: report the differences and let the user decide. Then run `build_figure_canvas("FigureN", "journal")`, `export_figure_pdf()`, `check_figure_svg()` and `check_pdf_fonts()`.
+If the user says a final render failed or stopped, read `figure_assembly/drafting/project_checks.md` first: it records the reason. Never build the journal figure while the latest canvas and the tables disagree: report the differences and let the user decide. Then run `build_figure_canvas("FigureN", "journal")`, `export_figure_pdf()`, `check_figure_svg()` and `check_pdf_fonts()`.
 
 ## Panels not drawn by R (`plot_kind = external`)
 
@@ -64,23 +64,23 @@ Never build the journal figure while the latest canvas and the tables disagree: 
 
 Exploration reports feed tentative figures; final figures come only from the figures document. See PROTOCOL.md, "Several source reports".
 
-- **Adding the toolkit to a report:** insert the setup chunk with `draft_mode <- TRUE`, and check that `embed-resources: true` is set and that the toolkit path resolves to the paper project's `figure_assembly/`. Never set `draft_mode <- FALSE` in an exploration report. If the report, its header or `_quarto.yml` sets a report-wide `fig.path`, warn that every unmarked plot is kept as a file in that folder and offer to remove the setting. Files already in that folder stay unless the user deletes them.
+- **Adding the toolkit to a report:** insert the setup chunk with `draft_mode <- TRUE`, and check that `embed-resources: true` is set and that the toolkit path resolves to the paper project's `figure_assembly/`. Never set `draft_mode <- FALSE` in an exploration report. If `check_project()` reports `report_fig_path` for the report (a report-wide `fig.path` in the report, its header, `_quarto.yml` or `_metadata.yml`), warn that every unmarked plot is kept as a file in that folder and offer to remove the setting. Files already in that folder stay unless the user deletes them.
 - **Combining the plots of a chunk:** when a marked chunk draws several plots, propose one edit and make it only after the user agrees. Apply the placeholder to each plot, and end the chunk with one combining call: `gridExtra::grid.arrange()` for grid objects such as Euler plots, `patchwork::wrap_plots()` for ggplot2 plots, and, for pheatmap, `grid.arrange()` of each result's `$gtable` (drawn with `silent = TRUE`). Choose the arrangement (one row, a grid) from the number of plots and the panel's space, and say which. The drawn plots stay the same; never change data, statistics or mappings to do it. Moving the legend to annotations on a combined plot keeps only the last plot's legend, because every plot of the chunk writes the same legend file; tell the user.
 - **Moving a panel** ("move the UMAP to 4b"):
   1. Sync the latest canvas of every figure involved first, so no canvas holds unsynced edits under the old id.
-  2. Rename the chunk label and every reference to it in the same report (`@<label>`, `ref.label`, `dependson`). Warn when the chunk is cached: a new label discards its cache, and the next render recomputes it. An external panel has no chunk: skip this step, and for another figure say that its image stays in the old figure's annotations until the user copies it across.
+  2. Rename the chunk label and every reference to it in the same report (`@<label>`, `ref.label`, `dependson`); `find_plot_id_references("<old id>")` lists them. Warn when the chunk is cached: a new label discards its cache, and the next render recomputes it. An external panel has no chunk: skip this step, and for another figure say that its image stays in the old figure's annotations until the user copies it across.
   3. In `panel_specs.tsv`, rename `plot_id` and set `figure` and `panel_letter`. For another figure, place the panel in free space on that page and say where; extend the page height in `figure_layout.tsv` if needed, or add the figure's row if the figure is new.
   4. Do not edit canvases or annotation files to rename ids. Moved copies keep their old ids (`moved__<old id>__…`), which is harmless. For another figure, say that freehand content and moved copies stay in the old figure, and offer to clear `moved_placed` so the new figure gets fresh copies.
   5. Show the diff. Render the report as in step 6 of "Build / update Figure N", then build new rounds of every figure involved.
 - **Tentative to final:** the copy in the figures document keeps its label. Rename the exploration copy's label so it no longer matches `figure_label_pattern` (prefix `explored-`), and say that its plot returns to the report's own size. Then compare the figure's plot ids in the figures document with those of the tentative figure. Never decide alone what happens to the tentative layout.
   - Same plot ids: use the last tentative settings and say so. Build the next round, render a preview, and look at it to list annotations that may no longer fit the new plots.
   - Plot ids added, removed or replaced: list the changes, and ask whether to keep the tentative settings for the remaining plots or start fresh. Start fresh: clear the size, position and setting columns of the figure's rows (keep `figure`, `panel_letter`, `plot_kind`), propose a new first layout as in "Round 0", and ask before renaming the figure's annotations file.
-- **Leftovers:** before the final render, list `panel_specs.tsv` rows whose `plot_id` is the label of no chunk in any report, leaving out rows with `plot_kind = external`, and propose deleting them.
-- **Limits:** these checks run only when the user talks to Claude. When a duplicate label is found, say that the other report's plot file was overwritten and that re-rendering that report restores it.
+- **Leftovers:** `check_project()` lists `panel_specs.tsv` rows whose `plot_id` is the label of no chunk in any report that loads the toolkit (`leftover_row`; rows with `plot_kind = external` are never listed). Before the final render, propose deleting them.
+- **Limits:** the checks also run at every render, but they write only to the render log, which the user may not read, and a duplicate label does not stop a draft render. When a duplicate label is found, say that the other report's plot file was overwritten and that re-rendering that report restores it. The checks read reports as text: labels made by code and chunks of child documents are not seen.
 
 ## Files
 
 - Never overwrite a user's canvas; builds always write a new round.
 - Never hand-edit generated SVGs; regenerate them.
 - `drafting/` is disposable; `specs/`, `annotations/` and the figures document are the record.
-- A document-wide `fig.path` keeps every unmarked plot as a file. Warn about it when setting up any figures document, and offer to remove it.
+- A document-wide `fig.path` keeps every unmarked plot as a file (`report_fig_path` in `check_project()`). Warn about it when setting up any figures document, and offer to remove it.
