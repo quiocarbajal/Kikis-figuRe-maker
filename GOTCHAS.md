@@ -6,7 +6,7 @@ Places where the natural first approach fails. Add an entry only when that happe
 Use `mapped point sizes: 0.5` instead: the dots are sized from the data, so a fixed point size has no effect. Relative sizes and the size legend stay correct.
 
 ## `points` stops shrinking dots below about 0.5 mm
-ggplot2's default point outline (`stroke = 0.5`) sets the minimum size. No toolkit setting reaches the outline yet.
+ggplot2's default `stroke` (0.5) adds a fixed amount to every dot, and a border to shape 19; shape 16 alone does not help, because the stroke still enlarges the dot. The toolkit now gives solid dots (shapes 15–20, shape and size not mapped) no stroke whenever `points` is set, so the size alone sets the dot.
 
 ## Line-width settings don't change colour-bar ticks
 `axis lines` and `lines` don't reach them; they stay at about 0.38 pt. No toolkit setting reaches them yet.

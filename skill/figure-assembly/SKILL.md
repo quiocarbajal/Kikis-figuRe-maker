@@ -29,7 +29,7 @@ Use the toolkit (`read_canvas_boxes()`, `read_canvas_plot_positions()`, `compare
 4. Setting lines with known names (see `box_note_settings` in `R/assembly_canvas.R`) are already exact table differences; report any marked "NOT applied" back to the user. Translate only the free-text requests (field `notes`) into values of existing `panel_specs.tsv` columns, for example:
    - "axis text 5 pt" → `axis_text_pt = 5`
    - "no legend" → `legend_position = none`
-   - "smaller dots" → a lower `point_size_ggplot` (state the value chosen)
+   - "smaller dots" → a lower `point_size_ggplot` (state the value chosen). With it set, solid dots (shapes 15–20, shape and size not mapped) get no stroke, so a value draws a smaller dot than the same size in plain ggplot2.
    - "thinner lines" → `line_width_pt`; "axis lines 0.5 pt" → `axis_line_pt`
    - heatmap text → `heatmap_font_pt` (row and column variants exist)
    - Euler labels or numbers → `euler_label_pt` / `euler_quantity_pt`

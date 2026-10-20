@@ -111,6 +111,19 @@ build_appearance_theme <- function(panel_specs, plot_id, font_family, plot) {
 
 text_geom_classes <- c("GeomText", "GeomLabel", "GeomTextRepel", "GeomLabelRepel")
 
+# Solid point shapes. For these, ggplot2's stroke adds a fixed amount to every
+# dot (and draws a same-colour border on shape 19), so small dots stop
+# shrinking. Outline-only shapes (0-14) are drawn by the stroke, and shapes
+# 21-25 have a border of their own colour: both keep their stroke.
+solid_point_shapes <- 15:20
+
+# The fixed shape of a point layer: set in the layer, or the theme's default.
+layer_point_shape <- function(point_layer, complete_plot_theme) {
+  point_shape <- point_layer$aes_params$shape %||% complete_plot_theme$geom$pointshape %||% 19
+  if (is.character(point_shape)) point_shape <- translate_shape_string(point_shape)
+  point_shape
+}
+
 # Fixed layer settings the table may change. A setting is skipped for a layer
 # when the layer (or the inherited plot mapping) maps it to data, so a table
 # value can never override an aesthetic that encodes data.
@@ -119,6 +132,7 @@ apply_permitted_layer_settings <- function(plot, panel_specs, plot_id) {
   label_text_pt <- lookup_panel_spec(panel_specs, plot_id, "label_text_pt", default = NA_real_)
   line_width_pt <- lookup_panel_spec(panel_specs, plot_id, "line_width_pt", default = NA_real_)
   fixed_alpha <- lookup_panel_spec(panel_specs, plot_id, "alpha", default = NA_real_)
+  complete_plot_theme <- if (!is.na(point_size_ggplot)) complete_theme(plot$theme) else NULL
 
   plot$layers <- map(plot$layers, \(original_layer) {
     mapped_aesthetics <- names(original_layer$mapping)
@@ -133,6 +147,12 @@ apply_permitted_layer_settings <- function(plot, panel_specs, plot_id) {
     }
     if (!is_text_layer && !is.na(point_size_ggplot) && inherits(original_layer$geom, "GeomPoint")) {
       new_settings$size <- point_size_ggplot
+      # With a fixed size, solid dots also get no stroke, so that the size alone
+      # sets the visible dot (no minimum). Only where the size and shape are fixed.
+      if (!any(c("size", "shape") %in% mapped_aesthetics) &&
+          isTRUE(layer_point_shape(original_layer, complete_plot_theme) %in% solid_point_shapes)) {
+        new_settings$stroke <- 0
+      }
     }
     if (!is.na(line_width_pt) && "linewidth" %in% layer_aesthetics) {
       new_settings$linewidth <- line_pt_to_ggplot_linewidth(line_width_pt)
