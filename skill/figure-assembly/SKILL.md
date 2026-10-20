@@ -5,9 +5,11 @@ description: Assemble paper figures from R plots with the figure-assembly toolki
 
 # Figure assembly (appearance only)
 
-Read `PROTOCOL.md` in the toolkit repository for the full workflow. This file tells Claude how to take part.
+Read `figure_assembly/PROTOCOL.md` for the full workflow. This file tells the assistant how to take part.
 
-Before acting on a request, check `GOTCHAS.md` in the toolkit repository: places where the natural first approach is known to fail.
+If the project has `figure_assembly/SKILL.md`, follow that copy, not a skill installed in your tool: it matches the project's toolkit version.
+
+Before acting on a request, check `figure_assembly/GOTCHAS.md`: places where the natural first approach is known to fail.
 
 ## Non-negotiable boundary
 
@@ -19,14 +21,14 @@ Never edit analysis lines in the figures document or in any other report that lo
 
 ## Never do arithmetic on SVG transforms by hand
 
-Use the toolkit (`read_canvas_boxes()`, `read_canvas_plot_positions()`, `compare_canvas_with_tables()`, `measure_text_sizes()`) or Inkscape's `--query-all`, which reports px at 96 per inch; set `LANG=en_US.UTF-8`, or its output is cut off. Check every result with `render_canvas_preview()` and look at the PNG. Previews go to a temporary file or Claude's scratch folder, never into the project: the SVG is the user's preview.
+Use the toolkit (`read_canvas_boxes()`, `read_canvas_plot_positions()`, `compare_canvas_with_tables()`, `measure_text_sizes()`) or Inkscape's `--query-all`, which reports px at 96 per inch; set `LANG=en_US.UTF-8`, or its output is cut off. Check every result with `render_canvas_preview()` and look at the PNG. Previews go to a temporary file or the assistant's scratch folder, never into the project: the SVG is the user's preview.
 
 ## "Build / update Figure N"
 
 1. Load the toolkit from `figure_assembly/R/`, with the project folder as the working directory.
 2. Read the files in `figure_assembly/drafting/project_checks/`, if any: one per report, each the record of that report's last render (mode, time, findings, chunks that drew several plots, canvas comparisons, and why a final render stopped). Findings in older files may be out of date; the newest file and `check_project()` are current. The user rarely reads the render log, so tell them anything there they may not have seen, such as a final render that stopped. Then run `check_project()` (PROTOCOL.md, "Project checks") and report its findings for this figure in plain language, problems first. `duplicate_label`: stop and report both files; the plot file in `drafting/` comes from whichever was rendered last. `multi_plot_chunk`: only `-1.svg` is assembled; propose combining the plots, as under "Several source reports". `stale_plot_files`: propose deleting them. `leftover_row` and `report_fig_path`: as under "Several source reports". Act on a finding (delete files, edit a report or a table) only after the user agrees.
 3. If a working canvas exists, run `compare_canvas_with_tables()` on the latest one and report the differences in plain language. Positions and sizes come only from the boxes. If `format_moved_plots()` lists plots moved or resized on the canvas itself, warn the user: those moves are ignored, the next round redraws each plot at its box, and the box is what to move or resize.
-4. Setting lines with known names (see `box_note_settings` in `R/assembly_canvas.R`) are already exact table differences; report any marked "NOT applied" back to the user. Translate only the free-text requests (field `notes`) into values of existing `panel_specs.tsv` columns, for example:
+4. Setting lines with known names (see `box_note_settings` in `figure_assembly/R/assembly_canvas.R`) are already exact table differences; report any marked "NOT applied" back to the user. Translate only the free-text requests (field `notes`) into values of existing `panel_specs.tsv` columns, for example:
    - "axis text 5 pt" → `axis_text_pt = 5`
    - "no legend" → `legend_position = none`
    - "smaller dots" → a lower `point_size_ggplot` (state the value chosen). With it set, solid dots (shapes 15–20, shape and size not mapped) get no stroke, so a value draws a smaller dot than the same size in plain ggplot2.
@@ -43,7 +45,7 @@ Use the toolkit (`read_canvas_boxes()`, `read_canvas_plot_positions()`, `compare
 
    If a request has no column, say so and propose a new appearance-only placeholder; never touch analysis arguments. If a note is ambiguous, or names a plot that matches several chunk labels, ask.
 5. Show the proposed table changes and the annotations to be copied before writing, unless the project's rules say otherwise. Then write them with `update_tables_from_canvas()`, `write_panel_specs()`, `write_figure_layout()` and `extract_annotations_from_canvas()`.
-6. The user renders the figures document. Claude renders only when the project's rules allow it or the user asks.
+6. The user renders the figures document. The assistant renders only when the project's rules allow it or the user asks.
 7. Build the next round with `build_figure_canvas("FigureN")`, render a preview, and run `check_figure_svg()` with the project's journal preset. Report the effective font sizes per layer, any issues, and annotations that may need a nudge because a plot was redrawn.
 
 ## Round 0 (first layout)
@@ -88,4 +90,4 @@ Exploration reports feed tentative figures; final figures come only from the fig
 - Never hand-edit generated SVGs; regenerate them.
 - `drafting/` is disposable; `specs/`, `annotations/` and the figures document are the record.
 - A document-wide `fig.path` keeps every unmarked plot as a file (`report_fig_path` in `check_project()`). Warn about it when setting up any figures document, and offer to remove it.
-- When your natural first approach fails in real use and another one works (or none does), propose a `GOTCHAS.md` entry in the same two-part format. Save it only after the user agrees.
+- When your natural first approach fails in real use and another one works (or none does), write a proposed `GOTCHAS.md` entry in the same two-part format in the chat, for the toolkit's author; never edit the copy in `figure_assembly/`.

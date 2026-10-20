@@ -20,7 +20,7 @@ position_tolerance_mm <- 0.05
 
 # Setting names that can be written in a box note ("axis text: 7 pt") and the
 # panel_specs.tsv column each one sets, per plot kind. A box shows only the
-# settings that have a value; any other line is a request for Claude to read.
+# settings that have a value; any other line is a request for the assistant to read.
 box_note_settings <- tribble(
   ~setting_name,        ~column_name,          ~value_type, ~plot_kind,
   "title",              "title_pt",            "pt",        "ggplot",
@@ -143,7 +143,7 @@ parse_setting_value <- function(written_value, value_type) {
 }
 
 # Splits a box note into recognised settings (applied by code) and free text
-# (read by Claude). Lines written by toolkit version 0.1.0 starting with
+# (read by the assistant). Lines written by toolkit version 0.1.0 starting with
 # "round 0:" were layout explanations and are ignored.
 parse_box_note <- function(note_text, plot_kind) {
   kind_settings <- dplyr::filter(box_note_settings, .data$plot_kind == .env$plot_kind)
@@ -165,7 +165,7 @@ parse_box_note <- function(note_text, plot_kind) {
       settings <- bind_rows(settings, tibble(column_name = matched_setting$column_name, value = parsed_value$value,
                                              problem = parsed_value$problem, line = note_line))
     } else {
-      free_text <- c(free_text, note_line) # unknown names are requests for Claude
+      free_text <- c(free_text, note_line) # unknown names are requests for the assistant
     }
   }
   list(settings = settings, free_text = paste(free_text, collapse = " | "))
@@ -211,7 +211,7 @@ plot_file_path <- function(assembly_directory, figure_name, plot_id, draft_mode)
 # Boxes and their notes from the "boxes" layer. Each text belongs to the
 # smallest box that contains its anchor point. Generated boxes carry the id
 # "box__<plot_id>"; boxes you draw yourself are matched through their note
-# ("plot: <name>") by Claude or by you.
+# ("plot: <name>") by the assistant or by you.
 read_canvas_boxes <- function(canvas_path, boxes_layer_label = "boxes") {
   canvas_document <- read_xml(canvas_path)
   page_geometry <- read_svg_page_geometry(canvas_document)
@@ -371,7 +371,7 @@ compare_canvas_with_tables <- function(canvas_path, panel_specs, figure_layout, 
     if (canvas_note != table_note) {
       field_differences <- bind_rows(field_differences, tibble(
         plot_id = canvas_box$plot_id, field = "notes", table_value = table_note,
-        canvas_value = canvas_note, source = "box note (for Claude to translate)"
+        canvas_value = canvas_note, source = "box note (for the assistant to translate)"
       ))
     }
     field_differences
@@ -458,7 +458,7 @@ stop_if_canvases_disagree_with_tables <- function(assembly_directory, panel_spec
       comparison_report <- paste(c(format_canvas_comparison(canvas_comparison), moved_plot_report), collapse = "\n")
       if (on_canvas_mismatch == "stop") {
         stop(comparison_report,
-             "\nNothing was rendered. Choose one: update the tables from the canvas (ask Claude, or use ",
+             "\nNothing was rendered. Choose one: update the tables from the canvas (ask the assistant, or use ",
              "update_tables_from_canvas()), or keep the tables by calling ",
              "start_figure_assembly(draft_mode = FALSE, on_canvas_mismatch = \"use_table\").",
              call. = FALSE)
@@ -920,7 +920,7 @@ build_figure_canvas <- function(figure_name, canvas_purpose = c("working", "jour
 
 # Places panels left to right in the given order, starting a new row when the
 # next panel would not fit the page width. Returns x/y positions and the page
-# height needed. Sizes are decided beforehand (by Claude or by you).
+# height needed. Sizes are decided beforehand (by the assistant or by you).
 layout_panels_in_rows <- function(plot_ids, widths_mm, heights_mm, page_width_mm,
                                   gap_mm = 4, margin_mm = 2) {
   x_positions <- numeric(length(plot_ids))
@@ -985,7 +985,7 @@ export_figure_eps <- function(svg_path, eps_path = str_replace(svg_path, "\\.svg
   run_inkscape_export(svg_path, eps_path, "eps", inkscape_path = inkscape_path)
 }
 
-# Preview image for checking a canvas by eye (used by Claude). Written to a
+# Preview image for checking a canvas by eye (used by the assistant). Written to a
 # temporary file outside the project by default: the SVG itself is the preview
 # for people.
 render_canvas_preview <- function(svg_path, png_path = tempfile(pattern = "canvas_preview_", fileext = ".png"),

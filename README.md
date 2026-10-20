@@ -18,7 +18,7 @@ Inspired by [FigureFirst](https://github.com/FlyRanch/figurefirst) (Python) and 
 | `R/assembly_*.R` | The toolkit code, copied into each paper project |
 | `presets/journal_presets.tsv` | Figure specifications for Nature, Nature Communications, Cell Press, Science, PNAS, eLife |
 | `templates/figure_assembly/` | Empty folder structure copied into each paper project |
-| `skill/figure-assembly/SKILL.md` | Instructions for Claude Code when it takes part |
+| `skill/figure-assembly/SKILL.md` | Instructions for the AI assistant when it takes part (Agent Skills format); copied into each paper project with the code |
 | `examples/example_figures.qmd` | A small example figures document with made-up data |
 | `VERSION` | Toolkit version recorded in each project |
 

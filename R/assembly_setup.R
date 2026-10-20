@@ -32,6 +32,9 @@ install_figure_assembly <- function(project_directory, toolkit_directory, journa
   file.copy(toolkit_code_files, file.path(assembly_directory, "R"))
   file.copy(file.path(toolkit_directory, "presets", "journal_presets.tsv"),
             file.path(assembly_directory, "settings", "journal_presets.tsv"))
+  # The instructions travel with the code, so they always match its version.
+  file.copy(file.path(toolkit_directory, c("PROTOCOL.md", "GOTCHAS.md", file.path("skill", "figure-assembly", "SKILL.md"))),
+            assembly_directory)
 
   settings_path <- file.path(assembly_directory, "settings", "project_settings.tsv")
   project_settings_table <- read_text_table(settings_path)
@@ -41,6 +44,7 @@ install_figure_assembly <- function(project_directory, toolkit_directory, journa
   write_tsv(project_settings_table, settings_path, na = "")
 
   message("Installed figure assembly toolkit ", toolkit_version, " into ", assembly_directory,
-          "\nNext: add the setup chunk to your figures document (see PROTOCOL.md, step 1).")
+          "\nNext: point your AI assistant to figure_assembly/SKILL.md, then add the setup chunk to your ",
+          "figures document (see figure_assembly/PROTOCOL.md, step 1).")
   invisible(assembly_directory)
 }
