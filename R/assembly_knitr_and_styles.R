@@ -36,7 +36,8 @@ theme_text_elements <- list(
                     "strip.text.y.left", "strip.text.y.right")
 )
 theme_line_elements <- list(
-  axis_line_pt = c(axis_sides("axis.line"), axis_sides("axis.ticks")),
+  # Colour-bar ticks are axis-like lines too: one width for all of them.
+  axis_line_pt = c(axis_sides("axis.line"), axis_sides("axis.ticks"), "legend.ticks"),
   grid_line_pt = c("panel.grid", "panel.grid.major", "panel.grid.minor", "panel.grid.major.x",
                    "panel.grid.major.y", "panel.grid.minor.x", "panel.grid.minor.y")
 )

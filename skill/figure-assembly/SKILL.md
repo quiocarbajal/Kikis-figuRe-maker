@@ -30,7 +30,7 @@ Use the toolkit (`read_canvas_boxes()`, `read_canvas_plot_positions()`, `compare
    - "axis text 5 pt" → `axis_text_pt = 5`
    - "no legend" → `legend_position = none`
    - "smaller dots" → a lower `point_size_ggplot` (state the value chosen). With it set, solid dots (shapes 15–20, shape and size not mapped) get no stroke, so a value draws a smaller dot than the same size in plain ggplot2.
-   - "thinner lines" → `line_width_pt`; "axis lines 0.5 pt" → `axis_line_pt`
+   - "thinner lines" → `line_width_pt`; "axis lines 0.5 pt" → `axis_line_pt` (also sets colour-bar ticks)
    - heatmap text → `heatmap_font_pt` (row and column variants exist)
    - Euler labels or numbers → `euler_label_pt` / `euler_quantity_pt`
 
@@ -38,6 +38,8 @@ Use the toolkit (`read_canvas_boxes()`, `read_canvas_plot_positions()`, `compare
    - several legends too wide → `legend_box_layout = vertical`.
    - renaming or formatting facet labels or set names (italics, superscripts) → move them to annotations; the user retypes them in Inkscape. Do not rename data values.
    - bold/plain axis text → `axis_text_face`; dots mapped to data too big → `mapped_size_factor`.
+
+   If a figure plot differs between renders without a code change, look for an unseeded random step and propose a seed (`PROTOCOL.md`, conventions). It's analysis code, so add it only with the user's agreement.
 
    If a request has no column, say so and propose a new appearance-only placeholder; never touch analysis arguments. If a note is ambiguous, or names a plot that matches several chunk labels, ask.
 5. Show the proposed table changes and the annotations to be copied before writing, unless the project's rules say otherwise. Then write them with `update_tables_from_canvas()`, `write_panel_specs()`, `write_figure_layout()` and `extract_annotations_from_canvas()`.
