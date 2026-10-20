@@ -13,15 +13,15 @@ Inspired by [FigureFirst](https://github.com/FlyRanch/figurefirst) (Python) and 
 
 | Path | What it is |
 |---|---|
-| `PROTOCOL.md` | The step-by-step protocol (start here) |
+| [`PROTOCOL.md`](PROTOCOL.md) | The step-by-step protocol (start here) |
 | [`FLOWCHARTS.md`](FLOWCHARTS.md) | Flow charts of the protocol and a table of its safety checks, for an overview first |
-| `GOTCHAS.md` | Places where the natural first approach fails, and what works instead |
-| `R/assembly_*.R` | The toolkit code, copied into each paper project |
-| `presets/journal_presets.tsv` | Figure specifications for Nature, Nature Communications, Cell Press, Science, PNAS, eLife |
-| `templates/figure_assembly/` | Empty folder structure copied into each paper project |
-| `skill/figure-assembly/SKILL.md` | Instructions for the AI assistant when it takes part (Agent Skills format); copied into each paper project with the code |
-| `examples/example_figures.qmd` | A small example figures document with made-up data |
-| `VERSION` | Toolkit version recorded in each project |
+| [`GOTCHAS.md`](GOTCHAS.md) | Places where the natural first approach fails, and what works instead |
+| [`R/assembly_*.R`](R/) | The toolkit code, copied into each paper project |
+| [`presets/journal_presets.tsv`](presets/journal_presets.tsv) | Figure specifications for Nature, Nature Communications, Cell Press, Science, PNAS, eLife |
+| [`templates/figure_assembly/`](templates/figure_assembly/) | Empty folder structure copied into each paper project |
+| [`skill/figure-assembly/SKILL.md`](skill/figure-assembly/SKILL.md) | Instructions for the AI assistant when it takes part (Agent Skills format); copied into each paper project with the code |
+| [`examples/example_figures.qmd`](examples/example_figures.qmd) | A small example figures document with made-up data |
+| [`VERSION`](VERSION) | Toolkit version recorded in each project |
 
 ## Requirements
 
@@ -43,7 +43,7 @@ Inspired by [FigureFirst](https://github.com/FlyRanch/figurefirst) (Python) and 
    install_figure_assembly("path/to/paper_project", "<toolkit>", journal_id = "nature_communications")
    ```
 
-3. Then follow `PROTOCOL.md`, step 1, from item 2.
+3. Then follow [`PROTOCOL.md`](PROTOCOL.md), step 1, from item 2.
 
 ## Status
 
@@ -51,4 +51,4 @@ Version 0.1.0, first draft. Tested end to end with emulated knitr chunks (instal
 
 ## License
 
-MIT. See `LICENSE`.
+MIT. See [`LICENSE`](LICENSE).

@@ -2,6 +2,8 @@
 
 Goal: every plot comes out of R at its final physical size, with text at the intended point size and lines at the intended width, so the assembled figure needs no resizing in Inkscape. Only small nudges of annotations remain.
 
+For an overview, see the flow charts in [`FLOWCHARTS.md`](FLOWCHARTS.md): one per stage of this protocol, and a table of every safety check.
+
 ## Hard rules
 
 1. **Appearance only.** This toolkit and its placeholders change sizes, fonts, line widths, legend placement, fixed point sizes and transparency. They never change data, filtering, thresholds, statistics (bins, smoothing, bandwidth), scales, axis limits or zoom, axis transformations, aesthetic mappings, or statistical annotations. Such changes belong in the analysis code and in a separate protocol.
